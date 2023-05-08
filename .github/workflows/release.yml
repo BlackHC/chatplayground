@@ -22,6 +22,8 @@ jobs:
     permissions:
       # IMPORTANT: this permission is mandatory for trusted publishing
       id-token: write
+      # We need to publish the documentation
+      contents: write
 
     strategy:
       matrix:
