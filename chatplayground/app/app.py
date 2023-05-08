@@ -10,6 +10,7 @@ import time
 import types
 import typing
 import weakref
+from contextlib import aclosing
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -1742,14 +1743,18 @@ class StoredExplorationsSingleton(FileSystemEventHandler):
         if origin is not None:
             origin = origin.parent_state if origin.parent_state else origin
 
-        # send an event
-        for state in self._receivers.values():
-            if state.get_sid() != origin.get_sid():
-                # noinspection PyNoneFunctionAssignment,PyArgumentList
-                event_handler: pc.event.EventHandler = State.on_message_exploration_update(  # type: ignore
-                    message_exploration_uid  # type: ignore
-                )
-                app.sio.start_background_task(send_event, state, event_handler)
+        async def send_events():
+            # send an event
+            for state in self._receivers.values():
+                if state.get_sid() != origin.get_sid():
+                    # noinspection PyNoneFunctionAssignment,PyArgumentList
+                    event_handler: pc.event.EventHandler = State.on_message_exploration_update(  # type: ignore
+                        message_exploration_uid  # type: ignore
+                    )
+                    await send_event(state, event_handler)
+
+        #app.sio.start_background_task(send_event, state, event_handler)
+        helper_thread(send_events)
 
     def get(self, state: pc.State, uid: str):
         """Get a message exploration by its uid."""
@@ -2473,9 +2478,7 @@ def run_coroutine_in_thread(coroutine, *args, **kwargs):
     """
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-
-    coro = coroutine(*args, **kwargs)
-    loop.run_until_complete(coro)
+    asyncio.run(coroutine(*args, **kwargs))
 
 
 def helper_thread(coroutine, *args, **kwargs):
@@ -2594,39 +2597,40 @@ class ModelRequestsState(State):
         try:
             response = await active_message.source.query_openai(openai_messages)
             residual_content = ""
-            async for partial_response in response:
-                if self._active_message is None or self._active_message.uid != active_message.uid:
-                    return
+            async with aclosing(response):
+                async for partial_response in response:
+                    if self._active_message is None or self._active_message.uid != active_message.uid:
+                        return
 
-                # finish reason?
-                if partial_response['choices'][0]['finish_reason'] == 'stop':
-                    break
+                    # finish reason?
+                    if partial_response['choices'][0]['finish_reason'] == 'stop':
+                        break
 
-                delta = partial_response['choices'][0]['delta']
+                    delta = partial_response['choices'][0]['delta']
 
-                if 'role' in delta:
-                    assert delta['role'] == 'assistant'
+                    if 'role' in delta:
+                        assert delta['role'] == 'assistant'
 
-                if 'content' in delta:
-                    content = residual_content + delta['content']
-                    # noinspection PyNoneFunctionAssignment,PyArgumentList
-                    event_handler: pc.event.EventHandler = ModelRequestsState.receive_partial_response(  # type: ignore
-                        PartialResponsePayload(
-                            uid=active_message.uid,
-                            content=content,
+                    if 'content' in delta:
+                        content = residual_content + delta['content']
+                        # noinspection PyNoneFunctionAssignment,PyArgumentList
+                        event_handler: pc.event.EventHandler = ModelRequestsState.receive_partial_response(  # type: ignore
+                            PartialResponsePayload(
+                                uid=active_message.uid,
+                                content=content,
+                            )
                         )
-                    )
-                    await send_event(self, event_handler)
+                        await send_event(self, event_handler)
 
-                    try:
-                        self._request_barrier.wait(timeout=1.0)
-                        residual_content = ""
-                    except threading.BrokenBarrierError:
-                        residual_content += content
-                        self._request_barrier = threading.Barrier(2)
+                        try:
+                            self._request_barrier.wait(timeout=1.0)
+                            residual_content = ""
+                        except threading.BrokenBarrierError:
+                            residual_content += content
+                            self._request_barrier = threading.Barrier(2)
 
-                    # Minimum wait time to avoid dropped packets.
-                    await asyncio.sleep(0.050)
+                        # Minimum wait time to avoid dropped packets.
+                        await asyncio.sleep(0.01)
 
             # Make sure any residual content is still sent.
             while residual_content:
@@ -2648,7 +2652,7 @@ class ModelRequestsState(State):
                 else:
                     break
 
-                await asyncio.sleep(0.050)
+                await asyncio.sleep(0.01)
 
             # noinspection PyNoneFunctionAssignment,PyArgumentList
             event_handler: pc.event.EventHandler = ModelRequestsState.receive_partial_response(  # type: ignore
@@ -2666,7 +2670,7 @@ class ModelRequestsState(State):
                 else:
                     break
 
-                await asyncio.sleep(0.050)
+                await asyncio.sleep(0.01)
         except asyncio.TimeoutError:
             # noinspection PyNoneFunctionAssignment,PyArgumentList
             event_handler: pc.event.EventHandler = ModelRequestsState.receive_error(  # type: ignore
