@@ -19,6 +19,10 @@ jobs:
     name: Create Release
     runs-on: ubuntu-22.04
 
+    permissions:
+      # IMPORTANT: this permission is mandatory for trusted publishing
+      id-token: write
+
     strategy:
       matrix:
         python-versions: ["3.10"]
@@ -78,10 +82,5 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Publish
-        env:
-          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
-        run: |
-          poetry config pypi-token.pypi $PYPI_TOKEN
-          poetry publish --dry-run
-          poetry publish --build
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
