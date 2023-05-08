@@ -24,8 +24,11 @@ def main():
     os.environ["PYTHONPATH"] = os.path.abspath(os.path.dirname(__file__))
     os.chdir(os.path.dirname(__file__))
     print(os.getcwd())
-    # execute `pc init` in the current directory as a subprocess
-    subprocess.run(["pc", "init"], check=True, cwd=os.getcwd())
+    subprocess.run(
+        [sys.executable, "-m", "pynecone.pc", "init"],
+        check=True,
+        cwd=os.getcwd()
+    )
     cli.main(["run"] + sys.argv[1:])
 
 
