@@ -1753,7 +1753,7 @@ class StoredExplorationsSingleton(FileSystemEventHandler):
                     )
                     await send_event(state, event_handler)
 
-        #app.sio.start_background_task(send_event, state, event_handler)
+        # app.sio.start_background_task(send_event, state, event_handler)
         helper_thread(send_events)
 
     def get(self, state: pc.State, uid: str):
@@ -2611,26 +2611,28 @@ class ModelRequestsState(State):
                     if 'role' in delta:
                         assert delta['role'] == 'assistant'
 
-                    if 'content' in delta:
-                        content = residual_content + delta['content']
-                        # noinspection PyNoneFunctionAssignment,PyArgumentList
-                        event_handler: pc.event.EventHandler = ModelRequestsState.receive_partial_response(  # type: ignore
-                            PartialResponsePayload(
-                                uid=active_message.uid,
-                                content=content,
-                            )
+                    if 'content' not in delta:
+                        continue
+
+                    content = residual_content + delta['content']
+                    # noinspection PyNoneFunctionAssignment,PyArgumentList
+                    event_handler: pc.event.EventHandler = ModelRequestsState.receive_partial_response(  # type: ignore
+                        PartialResponsePayload(
+                            uid=active_message.uid,
+                            content=content,
                         )
-                        await send_event(self, event_handler)
+                    )
+                    await send_event(self, event_handler)
 
-                        try:
-                            self._request_barrier.wait(timeout=1.0)
-                            residual_content = ""
-                        except threading.BrokenBarrierError:
-                            residual_content += content
-                            self._request_barrier = threading.Barrier(2)
+                    try:
+                        self._request_barrier.wait(timeout=1.0)
+                        residual_content = ""
+                    except threading.BrokenBarrierError:
+                        residual_content += content
+                        self._request_barrier = threading.Barrier(2)
 
-                        # Minimum wait time to avoid dropped packets.
-                        await asyncio.sleep(0.01)
+                    # Minimum wait time to avoid dropped packets.
+                    await asyncio.sleep(0.01)
 
             # Make sure any residual content is still sent.
             while residual_content:
