@@ -24,7 +24,8 @@ def main():
     os.environ["PYTHONPATH"] = os.path.abspath(os.path.dirname(__file__))
     os.chdir(os.path.dirname(__file__))
     print(os.getcwd())
-    subprocess.run(["pc", "init"])
+    # execute `pc init` in the current directory as a subprocess
+    subprocess.run(["pc", "init"], check=True, cwd=os.getcwd())
     cli.main(["run"] + sys.argv[1:])
 
 
