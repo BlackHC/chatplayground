@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.0.3] - 2023-08-06)
+## [1.0.3] - 2023-08-06
 
 * try something else for `pc init`.
 
