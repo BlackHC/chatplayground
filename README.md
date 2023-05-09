@@ -20,17 +20,21 @@ The ChatGPP web app is a great way to play with LLMs, but it has a few limitatio
 
 ## Installation
 
+### Node.JS
+
 To install Chat Playground, first, make sure you have Node.js installed. You can use `conda` to install Node.js as follows:
 
 ```
 conda install -c conda-forge nodejs
 ```
 
-Or, to install a specific version of Node.js (this one worked for me):
+Or, to install a specific version of Node.js (this one worked for me on my MacBook---so this will not work on Linux):
 
 ```
 conda install -c conda-forge nodejs=18.15.0=h26a3f6d_0
 ```
+
+### Chat Playground
 
 Once Node.js is installed, you can install Chat Playground using `pip` or `pipx` (if you have nodejs available in your base environment):
 
@@ -38,18 +42,13 @@ Once Node.js is installed, you can install Chat Playground using `pip` or `pipx`
 pipx install chatplayground
 ```
 
+### OpenAI Key :key:
+
 Ensure that your OpenAI key is set in an OPENAI_API_KEY environment variable. You then can run the playground with
 
 ```
 chatplayground
 ```
-
-## Documentation
-
-* Official Documentation: <https://blackhc.github.io/chatplayground>
-* Source Code: <https://github.com/blackhc/chatplayground>
-* PyPI Package: <https://pypi.org/project/chatplayground/>
-* License: GPL-3.0-only
 
 ## Features
 
@@ -82,6 +81,13 @@ There are a few issues with the current code (in part due to Pynecone's early st
 - Known Pynecone issues, as mentioned in the code.
 
 Despite these issues, the project came together very quickly with PyneCone and works quite well.
+
+## Documentation
+
+* License: GPL-3.0-only
+* Source Code: <https://github.com/blackhc/chatplayground>
+* PyPI Package: <https://pypi.org/project/chatplayground/>
+* Official Documentation: <https://blackhc.github.io/chatplayground>
 
 ## Contributing
 
