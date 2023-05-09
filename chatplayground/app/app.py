@@ -760,6 +760,7 @@ def render_edit_thread_button(message: StyledMessage):
         label="Edit thread: create a new thread while preserving consecutive messages",
     )
 
+
 def render_fork_thread_button(message: StyledMessage):
     """Render the fork thread button."""
     return render_tooltip(
@@ -1343,10 +1344,7 @@ def render_message_menu(message: StyledMessage):
         pc.popover_trigger(
             render_tooltip(
                 pc.button(
-                    pc.icon(tag="hamburger"),
-                    size='xs',
-                    variant='ghost',
-                    is_disabled=EditableMessageState.is_editing
+                    pc.icon(tag="hamburger"), size='xs', variant='ghost', is_disabled=EditableMessageState.is_editing
                 ),
                 label="Show the message menu with more available actions",
             )
@@ -1435,7 +1433,7 @@ def render_app_drawer():
                     message_exploration.uid == State.message_exploration_uid,
                     "Return to active exploration",
                     "Select exploration",
-                )
+                ),
             ),
             render_tooltip(
                 pc.button(
@@ -1700,7 +1698,10 @@ def render_message_exploration(message_thread: MessageThread):
                 ),
                 render_tooltip(
                     pc.button(
-                        react_icon(as_="RiChatNewLine"), variant="ghost", size="xs", on_click=State.new_message_exploration
+                        react_icon(as_="RiChatNewLine"),
+                        variant="ghost",
+                        size="xs",
+                        on_click=State.new_message_exploration,
                     ),
                     label="Start a new chat (the old one is saved)",
                 ),
@@ -1712,7 +1713,7 @@ def render_message_exploration(message_thread: MessageThread):
                         on_click=MessageGridState.toggle_grid,
                     ),
                     label="Toggle the expose-like message grid",
-                )
+                ),
             ),
             pc.heading(
                 pc.editable(
