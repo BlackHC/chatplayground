@@ -282,6 +282,9 @@ auto_focus_text_area = AutoFocusTextArea.create
 
 
 def render_tooltip(*args, **kwargs):
+    """
+    Render a tooltip.
+    """
     return pc.tooltip(*args, **kwargs, open_delay=500)
 
 
