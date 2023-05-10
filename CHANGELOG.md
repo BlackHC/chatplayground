@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.1.1] - 2023-05-09
+
+* change the default frontend and backend ports
+
 ## [1.1.0] - 2023-05-09
 
 * add tooltips.

@@ -9,6 +9,9 @@ import pynecone.pc as cli
 config = pc.Config(
     app_name="app",
     db_url="sqlite:///pynecone.db",
+    port=3111,
+    backend_port=8111,
+    api_url="http://localhost:8111",
     env=pc.Env.PROD,
     frontend_packages=[
         "react-object-view",
