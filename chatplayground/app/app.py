@@ -281,10 +281,17 @@ class AutoFocusTextArea(pc.TextArea):
 auto_focus_text_area = AutoFocusTextArea.create
 
 
+class AutoFocusInput(pc.Input):
+    """Text area that supports the autofocus attribute."""
+
+    auto_focus: Var[typing.Union[str, int, bool]]
+
+
+auto_focus_input = AutoFocusInput.create
+
+
 def render_tooltip(*args, **kwargs):
-    """
-    Render a tooltip.
-    """
+    """Render a tooltip."""
     return pc.tooltip(*args, **kwargs, open_delay=500)
 
 
@@ -1552,6 +1559,41 @@ def render_note_editor():
     )
 
 
+def render_title_editor():
+    """Render the title editor."""
+    # TODO: this is only because I cannot make the editable not very jerky.
+
+    return pc.cond(
+        ~State.title_editor,
+        pc.button(
+            pc.flex(
+                pc.cond(
+                    State.title_text,
+                    pc.text(State.title_text, width="100%"),
+                    pc.text("Untitled", color=SolarizedColors.base1, width="100%"),
+                ),
+                pc.spacer(),
+                pc.icon(tag="edit", size="xs"),
+                width="100%",
+                style={"text-align": "left"},
+                padding="0.25em",
+                margin="4px",
+            ),
+            on_click=State.start_title_editing(None),
+            variant="ghost",
+            width="100%",
+        ),
+        auto_focus_input(
+            default_value=State.title_text,
+            on_blur=State.update_title,
+            on_key_up=State.on_title_key_up,
+            on_change=State.set_title_text,
+            margin="0.25em",
+            auto_focus=True,
+        ),
+    )
+
+
 def render_model_options():
     """Render the model options."""
     return pc.table_container(
@@ -1719,15 +1761,9 @@ def render_message_exploration(message_thread: MessageThread):
                 ),
             ),
             pc.heading(
-                pc.editable(
-                    pc.editable_preview(),
-                    pc.editable_input(),
-                    value=State.title_text,
-                    placeholder="Untitled",
-                    on_change=State.set_title_text,
-                    on_submit=State.update_title,
-                ),
+                render_title_editor(),
                 size="md",
+                width="100%",
             ),
         ),
         pc.divider(margin="0.5em"),
@@ -2086,16 +2122,17 @@ class State(pc.State):
 
     message_exploration: MessageExploration = MessageExploration()
     note_editor: bool = False
-    drawer_visible: bool = False
-
+    title_editor: bool = False
     title_text: str = ""
+    drawer_visible: bool = False
 
     def on_message_exploration_update(self, message_exploration_uid: str):
         """Called when a message exploration is updated by the StoredExplorationsSingleton."""
         if message_exploration_uid != self.message_exploration.uid:
             return
 
-        return self.select_message_exploration(self, message_exploration_uid)  # type: ignore
+        message_exploration = message_explorations_singleton.get(self, message_exploration_uid)
+        self._set_message_exploration(self, message_exploration)  # type: ignore
 
     def new_message_exploration(self):
         """Create a new message exploration and make it the current one."""
@@ -2103,9 +2140,9 @@ class State(pc.State):
 
     def select_message_exploration(self, message_exploration_uid: str):
         """Select a message exploration by its UID and make it the current one."""
+        self.drawer_visible = False
         message_exploration = message_explorations_singleton.get(self, message_exploration_uid)
-        if message_exploration != self.message_exploration:
-            self._set_message_exploration(self, message_exploration)  # type: ignore
+        self._set_message_exploration(self, message_exploration)  # type: ignore
 
     def _update_message_exploration_registry(self):
         message_explorations_singleton.update(self, self.message_exploration)
@@ -2149,8 +2186,26 @@ class State(pc.State):
 
     def update_title(self, content):
         """Update the title in the current message exploration."""
-        self.message_exploration.title = content
+        print(f"Updating title to {content}")
+        self.message_exploration.title = content.strip()
         self._update_message_exploration_registry(self)  # type: ignore
+        self.title_editor = False
+        self.mark_dirty()
+
+    def on_title_key_up(self, key):
+        """Called when a key is pressed while editing the title."""
+        if key in ["Escape", "Enter"]:
+            if key == "Enter":
+                self.update_title(self, self.title_text)   # type: ignore
+            elif key == "Escape":
+                self.title_text = self.message_exploration.title
+
+            self.title_editor = False
+            self.mark_dirty()
+
+    def start_title_editing(self, _: typing.Any):
+        """Start editing the note."""
+        self.title_editor = True
         self.mark_dirty()
 
     @pc.var
@@ -2176,7 +2231,6 @@ class State(pc.State):
         if message_exploration != self.message_exploration:
             self.message_exploration = message_exploration
             self.title_text = message_exploration.title
-            self.drawer_visible = False
             self.mark_dirty()
 
 
