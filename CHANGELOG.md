@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.1.2] - 2023-05-11
+
+* fix title editing by using a self-made editable instead of pc.editable
+
 ## [1.1.1] - 2023-05-09
 
 * change the default frontend and backend ports
