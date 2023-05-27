@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.2.0] - 2023-05-27
+
+* fix a tooltip preventing a menu popup from appearing (disabled the tooltip)
+* rewrite the request logic to set the message content directly and remove all of the barrier logic
+
 ## [1.1.2] - 2023-05-11
 
 * fix title editing by using a self-made editable instead of pc.editable

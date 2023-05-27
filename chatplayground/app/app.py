@@ -1352,12 +1352,12 @@ def render_message_menu(message: StyledMessage):
     """Render the menu of a message."""
     return pc.popover(
         pc.popover_trigger(
-            render_tooltip(
+            # render_tooltip(
                 pc.button(
                     pc.icon(tag="hamburger"), size='xs', variant='ghost', is_disabled=EditableMessageState.is_editing
                 ),
-                label="Show the message menu with more available actions",
-            )
+            #    label="Show the message menu with more available actions",
+            # )
         ),
         pc.popover_content(
             pc.popover_arrow(),
@@ -2600,13 +2600,6 @@ async def send_event(state: pc.State, event_handler: pc.event.EventHandler):
     await app.sio.emit(str(pc.constants.SocketEvent.EVENT), state_update_json, to=state.get_sid(), namespace="/event")
 
 
-class PartialResponsePayload(typing.TypedDict):
-    """The payload of a partial response from the receiver thread."""
-
-    uid: str
-    content: str
-
-
 def run_coroutine_in_thread(coroutine, *args, **kwargs):
     """Run a coroutine in a separate thread.
 
@@ -2619,22 +2612,13 @@ def run_coroutine_in_thread(coroutine, *args, **kwargs):
 
 
 def helper_thread(coroutine, *args, **kwargs):
-    """Trying to fix issues with streaming messages.
-
-    Events keep getting dropped, so I've tried various things to fix it.
-
-    This is the latest attempt, which is to run the coroutine in a separate thread and use a barrier
-    and minimum delays. Sadly, this is a lot more of a hack than I'd like.
-    """
+    """Trying to fix issues with streaming messages."""
     t = threading.Thread(target=run_coroutine_in_thread, args=(coroutine, *args), kwargs=kwargs)
     t.start()
 
 
 class ModelRequestsState(State):
     """The state for LLM requests."""
-
-    # TODO: this is a hack to get around the fact that the events are being dropped when using app.sio.emit.
-    _request_barrier = threading.Barrier(2)
 
     model_type: str = "GPT-3.5"
     temperature: float = 0.7
@@ -2681,59 +2665,48 @@ class ModelRequestsState(State):
         self._update_message_exploration_registry(self)
         self.mark_dirty()
 
-    def receive_partial_response(self, payload_str: str):
-        """Receive a partial response from the receiver thread.
-
-        We currently use a barrier to sync the different threads to avoid messages being dropped.
-
-        Maybe adding a delay of 50ms was already enough, but I don't trust it anymore and don't want to have any
-        dropped words anymore.
-
-        TODO(blackhc): split a receive_finished_response method out of this (content="None" means finished).
-        """
-        # parse payload_str into a PartialResponsePayload using json.loads
-        payload: PartialResponsePayload = json.loads(payload_str)
-
-        if self._active_message is None or self._active_message.uid != payload['uid']:
+    def receive_finish(self, uid: str):
+        """Receive a finish message from the receiver thread."""
+        # parse uid
+        uid = json.loads(uid)
+        if self._active_message is None or self._active_message.uid != uid:
             return
 
-        if payload['content'] is None:
-            self._active_message = None
-            self._update_message_exploration_registry(self)
-        else:
-            assert isinstance(payload['content'], str)
-            assert self._active_message.content is not None
-            self._active_message.content += payload['content']
-
-            last_updated = message_explorations_singleton.get_last_updated_timestamp(self.message_exploration_uid)
-            # This seems to slow down the app too much
-            if last_updated + 1 < time.time():
-                self._update_message_exploration_registry(self)  # type: ignore
+        self._active_message = None
+        self._update_message_exploration_registry(self)
         self.mark_dirty()
 
-        # Signal to the other thread that we're done. (If this times out, that's not bad by itself.)
-        try:
-            self._request_barrier.wait(timeout=0.1)
-        except threading.BrokenBarrierError:
-            pass
+    def receive_partial_response(self, uid: str):
+        """Receive a partial response from the receiver thread."""
+        # parse uid
+        uid = json.loads(uid)
 
-    def receive_error(self, payload_str: str):
-        """Receive an error from the receiver thread."""
-        # parse payload_str into a PartialResponsePayload using json.loads
-        payload: PartialResponsePayload = json.loads(payload_str)
-
-        if self._active_message is None or self._active_message.uid != payload['uid']:
+        if self._active_message is None or self._active_message.uid != uid:
             return
 
-        self._active_message.error = payload['content']
+        last_updated = message_explorations_singleton.get_last_updated_timestamp(self.message_exploration_uid)
+        # This seems to slow down the app too much
+        if last_updated + 1 < time.time():
+            self._update_message_exploration_registry(self)  # type: ignore
+        self.mark_dirty()
+
+    def receive_error(self, uid: str):
+        """Receive an error from the receiver thread."""
+        # parse uid
+        uid = json.loads(uid)
+
+        if self._active_message is None or self._active_message.uid != uid:
+            return
+
         self._active_message = None
         self._update_message_exploration_registry(self)  # type: ignore
         self.mark_dirty()
 
-    async def _query_openai(self, active_message, openai_messages):
+    async def _query_openai(self, active_message: Message, openai_messages):
         try:
             response = await active_message.source.query_openai(openai_messages)
-            residual_content = ""
+            content = ""
+            last_timestamp = time.time()
             async with aclosing(response):
                 async for partial_response in response:
                     if self._active_message is None or self._active_message.uid != active_message.uid:
@@ -2751,81 +2724,41 @@ class ModelRequestsState(State):
                     if 'content' not in delta:
                         continue
 
-                    content = residual_content + delta['content']
+                    content += delta['content']
+
+                    if last_timestamp + 1/30 > time.time():
+                        continue
+                    last_timestamp = time.time()
+
+                    active_message.content = content
+
                     # noinspection PyNoneFunctionAssignment,PyArgumentList
                     event_handler: pc.event.EventHandler = ModelRequestsState.receive_partial_response(  # type: ignore
-                        PartialResponsePayload(
-                            uid=active_message.uid,
-                            content=content,
-                        )
+                        active_message.uid
                     )
                     await send_event(self, event_handler)
 
-                    try:
-                        self._request_barrier.wait(timeout=1.0)
-                        residual_content = ""
-                    except threading.BrokenBarrierError:
-                        residual_content += content
-                        self._request_barrier = threading.Barrier(2)
-
-                    # Minimum wait time to avoid dropped packets.
-                    await asyncio.sleep(0.01)
-
-            # Make sure any residual content is still sent.
-            while residual_content:
-                if self._active_message is None or self._active_message.uid != active_message.uid:
-                    return
-                # noinspection PyNoneFunctionAssignment,PyArgumentList
-                event_handler: pc.event.EventHandler = ModelRequestsState.receive_partial_response(  # type: ignore
-                    PartialResponsePayload(
-                        uid=active_message.uid,
-                        content=content,
-                    )
-                )
-                await send_event(self, event_handler)
-
-                try:
-                    self._request_barrier.wait(timeout=1.0)
-                except threading.BrokenBarrierError:
-                    self._request_barrier = threading.Barrier(2)
-                else:
-                    break
-
-                await asyncio.sleep(0.01)
-
             # noinspection PyNoneFunctionAssignment,PyArgumentList
-            event_handler: pc.event.EventHandler = ModelRequestsState.receive_partial_response(  # type: ignore
-                PartialResponsePayload(
-                    uid=active_message.uid,
-                    content=None,
-                )
+            event_handler: pc.event.EventHandler = ModelRequestsState.receive_finish(  # type: ignore
+                active_message.uid
             )
-            while True:
-                await send_event(self, event_handler)
-                try:
-                    self._request_barrier.wait(timeout=1.0)
-                except threading.BrokenBarrierError:
-                    pass
-                else:
-                    break
 
-                await asyncio.sleep(0.01)
+            while self._active_message is not None and self._active_message.uid == active_message.uid:
+                await send_event(self, event_handler)
+                await asyncio.sleep(0.1)
+
         except asyncio.TimeoutError:
             # noinspection PyNoneFunctionAssignment,PyArgumentList
+            active_message.error = "Request Timeout Error"
             event_handler: pc.event.EventHandler = ModelRequestsState.receive_error(  # type: ignore
-                PartialResponsePayload(
-                    uid=active_message.uid,
-                    content="Request Timeout Error",
-                )
+                active_message.uid,
             )
             await send_event(self, event_handler)
         except Exception as e:
             # noinspection PyNoneFunctionAssignment,PyArgumentList
+            active_message.error = str(e)
             event_handler: pc.event.EventHandler = ModelRequestsState.receive_error(  # type: ignore
-                PartialResponsePayload(
-                    uid=active_message.uid,
-                    content=str(e),
-                )
+                active_message.uid
             )
             await send_event(self, event_handler)
             raise
