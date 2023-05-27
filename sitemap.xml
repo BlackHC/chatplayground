@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+         <loc>https://blackhc.github.io/chatplayground/</loc>
+         <lastmod>2023-05-27</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://blackhc.github.io/chatplayground/api/</loc>
+         <lastmod>2023-05-27</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://blackhc.github.io/chatplayground/changelog/</loc>
+         <lastmod>2023-05-27</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://blackhc.github.io/chatplayground/contributing/</loc>
+         <lastmod>2023-05-27</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://blackhc.github.io/chatplayground/installation/</loc>
+         <lastmod>2023-05-27</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://blackhc.github.io/chatplayground/usage/</loc>
+         <lastmod>2023-05-27</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+</urlset>
